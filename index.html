@@ -456,9 +456,9 @@
 
   <div class="card">
     <div class="toolbar">
-      <button id="playBtn" title="播放本句 (Tab)">▶ 播放本句</button>
+      <button id="playBtn" title="播放本句 (Shift+Tab)">▶ 播放本句</button>
       <button id="slowBtn" class="ghost" title="慢速播放">🐢 慢速</button>
-      <button id="wordBtn" class="ghost" title="朗讀目前單字 (Shift+Tab、F2 或 Ctrl+.)">🔊 目前單字</button>
+      <button id="wordBtn" class="ghost" title="朗讀目前單字 (Tab、F2 或 Ctrl+.)">🔊 目前單字</button>
       <button id="spellCurrentBtn" class="ghost" title="逐字母拼讀目前單字 (F3 或 Ctrl+/)">🔤 拼目前字</button>
       <button id="hintBtn" class="ghost" title="提示下一個字母 (Esc)">💡 提示</button>
       <button id="revealBtn" class="ghost" title="顯示完整答案">👁 答案</button>
@@ -490,7 +490,7 @@
     <div class="nav" style="margin-top: 1.2rem;">
       <button id="prevBtn" class="ghost">← 上一句</button>
       <span style="color: var(--muted); font-size: 0.8rem;">
-        快捷鍵：<kbd>Tab</kbd> 重播 · <kbd>Shift+Tab</kbd>/<kbd>F2</kbd>/<kbd>Ctrl+.</kbd> 目前單字 · <kbd>F3</kbd>/<kbd>Ctrl+/</kbd> 拼目前字 · <kbd>Esc</kbd> 提示 · <kbd>Enter</kbd> 下一句 · <kbd>M</kbd> 靜音
+        快捷鍵：<kbd>Esc</kbd> 提示 · <kbd>Tab</kbd>/<kbd>F2</kbd>/<kbd>Ctrl+.</kbd> 目前單字 · <kbd>Shift+Tab</kbd> 重播 · <kbd>F3</kbd>/<kbd>Ctrl+/</kbd> 拼目前字 · <kbd>Enter</kbd> 下一句 · <kbd>M</kbd> 靜音
       </span>
       <button id="nextBtn" class="ok-btn">下一句 →</button>
     </div>
@@ -2834,8 +2834,8 @@ $('muteBtn').addEventListener('click', toggleMute);
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Tab') {
     e.preventDefault();
-    if (e.shiftKey) speakCurrentWord();
-    else speakSentence(false);
+    if (e.shiftKey) speakSentence(false);
+    else speakCurrentWord();
   } else if (e.key === 'F2' || (e.ctrlKey && e.key === '.')) {
     e.preventDefault();
     speakCurrentWord();
