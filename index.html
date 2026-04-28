@@ -331,6 +331,10 @@
     color: white;
     transform: translateY(-2px);
   }
+  .word-chip.current-word {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(193, 120, 23, 0.18);
+  }
   .word-chip.hidden {
     background: #eee7d4;
     color: var(--muted);
@@ -454,6 +458,8 @@
     <div class="toolbar">
       <button id="playBtn" title="播放本句 (Tab)">▶ 播放本句</button>
       <button id="slowBtn" class="ghost" title="慢速播放 (Shift+Tab)">🐢 慢速</button>
+      <button id="wordBtn" class="ghost" title="朗讀目前單字 (F2 或 Ctrl+.)">🔊 目前單字</button>
+      <button id="spellCurrentBtn" class="ghost" title="逐字母拼讀目前單字 (F3 或 Ctrl+/)">🔤 拼目前字</button>
       <button id="hintBtn" class="ghost" title="提示下一個字母">💡 提示</button>
       <button id="revealBtn" class="ghost" title="顯示完整答案">👁 答案</button>
       <button id="transBtn" class="ghost" title="顯示翻譯">🌐 翻譯</button>
@@ -478,13 +484,13 @@
     <div class="words-section">
       <h3>🔤 單字朗讀（點擊即播，文字在完成前隱藏）</h3>
       <div id="words" class="words"></div>
-      <p class="hint-text">虛線框 = 文字隱藏，只能用聽的 · 點「拼」逐字母朗讀（也不顯示文字）· 完成整句或按「👁 答案」才會顯示拼寫。</p>
+      <p class="hint-text">虛線框 = 文字隱藏，只能用聽的 · 工具列可朗讀目前單字或拼目前字 · 點「拼」逐字母朗讀（也不顯示文字）· 完成整句或按「👁 答案」才會顯示拼寫。</p>
     </div>
 
     <div class="nav" style="margin-top: 1.2rem;">
       <button id="prevBtn" class="ghost">← 上一句</button>
       <span style="color: var(--muted); font-size: 0.8rem;">
-        快捷鍵：<kbd>Tab</kbd> 重播 · <kbd>Shift+Tab</kbd> 慢播 · <kbd>Enter</kbd> 下一句 · <kbd>M</kbd> 靜音
+        快捷鍵：<kbd>Tab</kbd> 重播 · <kbd>Shift+Tab</kbd> 慢播 · <kbd>F2</kbd>/<kbd>Ctrl+.</kbd> 目前單字 · <kbd>F3</kbd>/<kbd>Ctrl+/</kbd> 拼目前字 · <kbd>Enter</kbd> 下一句 · <kbd>M</kbd> 靜音
       </span>
       <button id="nextBtn" class="ok-btn">下一句 →</button>
     </div>
@@ -2559,17 +2565,72 @@ function tokenizeWords(sentence) {
   return sentence.split(/\s+/).filter(Boolean);
 }
 
+function getWordRanges(sentence) {
+  const ranges = [];
+  const re = /\S+/gu;
+  let match;
+  while ((match = re.exec(sentence)) !== null) {
+    ranges.push({
+      word: match[0],
+      start: match.index,
+      end: match.index + match[0].length,
+    });
+  }
+  return ranges;
+}
+
+function getCurrentWordInfo() {
+  const target = SENTENCES[current].de;
+  const cursor = input.selectionStart == null ? input.value.length : input.selectionStart;
+  const typedUntilCursor = input.value.slice(0, cursor);
+  let gi = countConsumedTargetChars(typedUntilCursor, target);
+
+  while (gi < target.length && isSpace(target[gi])) gi++;
+
+  const ranges = getWordRanges(target);
+  if (ranges.length === 0) return null;
+
+  const currentRange =
+    ranges.find(range => gi >= range.start && gi < range.end) ||
+    ranges.find(range => range.start >= gi) ||
+    ranges[ranges.length - 1];
+
+  return { ...currentRange, index: ranges.indexOf(currentRange) };
+}
+
+function speakCurrentWord() {
+  const info = getCurrentWordInfo();
+  if (!info) return;
+  speakWord(info.word);
+}
+
+function spellCurrentWord() {
+  const info = getCurrentWordInfo();
+  if (!info) return;
+  spellWord(info.word);
+}
+
+function updateCurrentWordHighlight() {
+  const info = getCurrentWordInfo();
+  const chips = wordsEl.querySelectorAll('.word-chip');
+  chips.forEach((chip, i) => {
+    chip.classList.toggle('current-word', info != null && i === info.index);
+  });
+}
+
 function renderWordChips(showText) {
   // Chips always appear (for audio playback), but the word text is only
   // revealed when the sentence is completed or the user pressed reveal.
   wordsEl.innerHTML = '';
   const words = tokenizeWords(SENTENCES[current].de);
   if (words.length === 0) return;
+  const currentInfo = getCurrentWordInfo();
 
   for (let i = 0; i < words.length; i++) {
     const w = words[i];
     const chip = document.createElement('span');
     chip.className = 'word-chip' + (showText ? '' : ' hidden');
+    if (currentInfo != null && i === currentInfo.index) chip.classList.add('current-word');
     chip.title = showText ? '點此朗讀單字' : `點此朗讀第 ${i + 1} 個字（文字已隱藏）`;
 
     const label = showText
@@ -2650,9 +2711,13 @@ function goTo(i) {
 
 // ===== Event handlers =====
 input.addEventListener('input', update);
+input.addEventListener('click', updateCurrentWordHighlight);
+input.addEventListener('keyup', updateCurrentWordHighlight);
 
 $('playBtn').addEventListener('click', () => speakSentence(false));
 $('slowBtn').addEventListener('click', () => speakSentence(true));
+$('wordBtn').addEventListener('click', speakCurrentWord);
+$('spellCurrentBtn').addEventListener('click', spellCurrentWord);
 
 // Count how many chars of target are consumed by the typed input (matching algorithm).
 // Mirrors compare() but only tracks target index, stopping at first mismatch.
@@ -2770,6 +2835,12 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Tab') {
     e.preventDefault();
     speakSentence(e.shiftKey);
+  } else if (e.key === 'F2' || (e.ctrlKey && e.key === '.')) {
+    e.preventDefault();
+    speakCurrentWord();
+  } else if (e.key === 'F3' || (e.ctrlKey && e.key === '/')) {
+    e.preventDefault();
+    spellCurrentWord();
   } else if ((e.key === 'm' || e.key === 'M') && !e.metaKey && !e.ctrlKey && e.target !== input) {
     e.preventDefault();
     toggleMute();
